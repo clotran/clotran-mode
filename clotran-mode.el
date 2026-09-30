@@ -35,7 +35,7 @@
 ;; connects when it prints "nREPL server started on port N" -- which
 ;; clotran-nrepl's bin/clotran-nrepl does, after resolving the project's
 ;; deps.edn with clotran-deps. So in a .cljf buffer plain M-x cider-jack-in
-;; starts clotran, and CIDER owns the process as it would a JVM's.
+;; starts clotran, and CIDER owns the process as it would clj's.
 
 (defun clotran--nrepl-command ()
   (expand-file-name "bin/clotran-nrepl" clotran-nrepl-dir))
