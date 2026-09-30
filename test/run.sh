@@ -10,7 +10,9 @@ emacs=${EMACS:-}
 [ -n "$emacs" ] || { echo "no Emacs found"; exit 1; }
 out=$(mktemp) || exit 1
 trap 'rm -f "$out"' EXIT
-CLOTRAN_MODE_DIR="$here" "$emacs" --batch \
+# PATH as an Emacs started from the macOS Dock has it: none of the user's
+# directories, so jack-in must find clotran and clotran-deps by itself
+PATH=/usr/bin:/bin CLOTRAN_MODE_DIR="$here" "$emacs" --batch \
   --eval "(setq clotran-nrepl-dir \"${CLOTRAN_NREPL_DIR:-$here/../clotran-nrepl}\")" \
   -l "$here/test/jack-in-test.el" >"$out" 2>&1
 st=$?
