@@ -40,12 +40,17 @@
     (with-current-buffer (repl-buffer)
       (check "the project's file loads, with its dependency from deps.edn"
              (nrepl-dict-get (cider-nrepl-sync-request:eval "(app.main/twice-answer)") "value") "84")
-      (check "and compiles"
+      nil)
+    (with-current-buffer buf
+      (check "a .cljf buffer is in clotran-mode, C-c C-K bound to compiling it"
+             (list clotran-mode (key-binding (kbd "C-c C-S-k"))) '(t clotran-compile-buffer))
+      (check "C-c C-K compiles the file" (call-interactively (key-binding (kbd "C-c C-S-k"))) 'installed))
+    (with-current-buffer (repl-buffer)
+      (check "and the compiled function is the one that runs"
              (nrepl-dict-get (cider-nrepl-sync-request:eval
-                              (format "[(clotran.loader/compile-now %S) (clojure.string/includes? (pr-str app.main/twice-answer) \"#<compiled\") (app.main/twice-answer)]"
-                                      (expand-file-name "src/app/main.cljf" proj)))
+                              "[(clojure.string/includes? (pr-str app.main/twice-answer) \"#<compiled\") (app.main/twice-answer)]")
                              "value")
-             "[:installed true 84]")))
+             "[true 84]")))
   (dolist (p (process-list)) (when (string-prefix-p "clotran" (process-name p)) (delete-process p)))
   (delete-directory root t))
 (kill-emacs (if (zerop fails) 0 1))

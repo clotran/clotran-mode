@@ -11,6 +11,13 @@ stock CIDER, unmodified:
   `deps.edn` with `clotran-deps` and starts the server; CIDER connects and
   owns the process. `M-x clotran-jack-in` does the same from any buffer.
 
+- `C-c C-K` (`clotran-compile-buffer`) saves the file, loads it into
+  clotran and compiles it to native code, waiting for the build, and says
+  in the minibuffer how it went: compiled, nothing in it compiles, or the
+  build log to read. `C-c C-k` alone compiles too, in the background.
+  A `.cljf` buffer turns on the `clotran-mode` minor mode (` clotran` in
+  the mode line), which holds the key.
+
 Not a fork of CIDER: CIDER's Emacs side speaks nREPL and runs as it is;
 `clotran-nrepl` is the server it talks to, as babashka's own server is for
 babashka. A `.cljf` file loaded from its buffer (`C-c C-k`) runs at once,
