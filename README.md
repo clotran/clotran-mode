@@ -5,15 +5,24 @@ stock CIDER, unmodified:
 
 - `.cljf` files (and scripts run by `clotran`) open in `clojure-mode`, so
   CIDER's commands work in them;
-- `M-x clotran-jack-in`, in any buffer of a project, starts clotran there
-  with the nREPL server from [clotran-nrepl](../clotran-nrepl) -- the
-  project's own `deps.edn` resolved by `clotran-deps` -- and connects
-  CIDER to it.
+- CIDER's own `M-x cider-jack-in` works in a `.cljf` buffer: clotran-mode
+  sets the buffer's `cider-jack-in-cmd` to `bin/clotran-nrepl` from
+  [clotran-nrepl](../clotran-nrepl), which resolves the project's
+  `deps.edn` with `clotran-deps` and starts the server; CIDER connects and
+  owns the process. `M-x clotran-jack-in` does the same from any buffer.
 
 Not a fork of CIDER: CIDER's Emacs side speaks nREPL and runs as it is;
 `clotran-nrepl` is the server it talks to, as babashka's own server is for
 babashka. A `.cljf` file loaded from its buffer (`C-c C-k`) runs at once,
 interpreted, and is compiled to native code in the background.
+
+## A project, quickly
+
+    mkdir -p hello/src/hello && cd hello
+    echo '{}' > deps.edn
+    echo '(ns hello.core) (defn greet [n] (str "hello, " n))' > src/hello/core.cljf
+
+then open `src/hello/core.cljf` in Emacs and `M-x cider-jack-in`.
 
 ## Setup
 

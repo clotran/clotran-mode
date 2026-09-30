@@ -30,8 +30,8 @@
     (insert "(ns app.main (:require [dep.core]))\n(defn twice-answer [] (* 2 dep.core/answer))\n"))
   (let ((buf (find-file-noselect (expand-file-name "src/app/main.cljf" proj))))
     (check "a .cljf file opens in clojure-mode" (with-current-buffer buf major-mode) 'clojure-mode)
-    (with-current-buffer buf (clotran-jack-in))
-    (check "jack-in starts clotran and CIDER connects" (not (null (wait-for #'repl-buffer 60))) t)
+    (with-current-buffer buf (cider-jack-in-clj nil))
+    (check "cider-jack-in, in a .cljf buffer, starts clotran and connects" (not (null (wait-for #'repl-buffer 60))) t)
     (with-current-buffer (repl-buffer)
       (check "eval" (nrepl-dict-get (cider-nrepl-sync-request:eval "(+ 1 2)") "value") "3"))
     (with-current-buffer buf
