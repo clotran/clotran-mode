@@ -1,147 +1,97 @@
-;;; clotran-mode.el --- REPL interaction for clotran  -*- lexical-binding: t; -*-
+;;; clotran-mode.el --- Emacs for clotran: .cljf files and CIDER jack-in  -*- lexical-binding: t; -*-
 
-;; Syntax highlighting: nothing to do here, `clojure-mode' already
-;; covers it -- clotran's reader is close enough to Clojure's that
-;; reinventing a major mode would just be duplicating clojure-mode.
-;; This file adds the one thing it doesn't have: a REPL process and
-;; ways to push buffer code into it.
+;; clotran is Clojure hosted on Fortran (~/jborden/clotran). Its source
+;; files are .cljf: Clojure's syntax, so they open in clojure-mode, and
+;; CIDER works in them. CIDER talks to clotran through the nREPL server
+;; in ~/jborden/clotran-nrepl, which is what `clotran-jack-in' starts.
 ;;
-;; Why not inf-clojure/CIDER: both assume a REPL close enough to real
-;; Clojure to run its introspection (doc/complete/nrepl) or its own
-;; startup forms; clotran-bin has none of that. More importantly,
-;; clotran-bin's REPL reads one *line* == one form at a time (see
-;; src/f/readline.f90 + main.f90's interactive_repl) -- a multi-line
-;; form sent as raw text over stdin would break mid-read. `load-file`,
-;; by contrast, slurps its whole argument file in a single read_str
-;; call and handles multi-line forms and comments fine
-;; (src/f/Eval.f90's eval_load_file_head). So every "send this code"
-;; command below funnels through a temp file + (load-file "...")
-;; rather than sending text directly -- one mechanism, and it's the
-;; same one that already handles the load/reload-a-file case.
+;;   (load "/path/to/clotran-mode/clotran-mode.el")
 ;;
-;; Not wired into `clojure-mode-hook' globally -- that would turn this
-;; on (and shadow cider's bindings) in every other Clojure project too.
-;; Turn it on per-project instead, e.g. via this repo's .dir-locals.el.
+;; then, in a buffer of a project (a directory with a deps.edn, or any
+;; directory), M-x clotran-jack-in.
+;;
+;; This replaces the comint mode that lived here before clotran had an
+;; nREPL server (see this repository's history).
 
-(require 'comint)
+(require 'clojure-mode)
+(require 'cider)
 
 (defgroup clotran nil
-  "Run and interact with a clotran REPL."
+  "clotran: Clojure hosted on Fortran."
   :group 'languages)
 
-(defcustom clotran-program nil
-  "Path to the clotran-bin executable.
-When nil, `run-clotran' looks for a `clotran-bin' file at or above
-`default-directory'.
+(defcustom clotran-program "clotran"
+  "The clotran command: the one `make install' puts on PATH, or a
+checkout's `clotran' launcher."
+  :type 'string)
 
-Talks to clotran-bin directly, not the rlwrap-wrapping `clotran`
-launcher: comint provides its own line editing/history, and rlwrap
-would just fight it for the tty (the project's own regression suite
-runs against clotran-bin for the same reason; see README.md)."
-  :type '(choice (const nil) file)
-  :group 'clotran)
+(defcustom clotran-deps-program "clotran-deps"
+  "The clotran-deps command, which answers a project's source path from
+its deps.edn."
+  :type 'string)
 
-(defcustom clotran-prompt-regexp "^user> "
-  "Regexp matching clotran-bin's prompt."
-  :type 'regexp
-  :group 'clotran)
+(defcustom clotran-nrepl-dir (expand-file-name "~/jborden/clotran-nrepl")
+  "The clotran-nrepl checkout whose server `clotran-jack-in' starts."
+  :type 'directory)
 
-(defvar clotran-buffer-name "*clotran*")
+;;; .cljf files are Clojure
 
-(define-derived-mode clotran-repl-mode comint-mode "Clotran REPL"
-  "Major mode for an inferior clotran process."
-  (setq comint-prompt-regexp clotran-prompt-regexp))
+(add-to-list 'auto-mode-alist '("\\.cljf\\'" . clojure-mode))
+(add-to-list 'interpreter-mode-alist '("clotran" . clojure-mode))
 
-(defun clotran--find-program ()
-  (or clotran-program
-      (let ((dir (locate-dominating-file default-directory "clotran-bin")))
-        (and dir (expand-file-name "clotran-bin" dir)))
-      (read-file-name "Path to clotran-bin: ")))
+;;; jack-in
 
-;;;###autoload
-(defun run-clotran ()
-  "Start (or switch to) the clotran REPL."
+(defun clotran--project-dir ()
+  (or (ignore-errors (clojure-project-dir)) default-directory))
+
+(defun clotran--source-path (dir)
+  "The project's CLOTRAN_PATH from clotran-deps, with clotran-nrepl's
+sources added; the project's own part is empty with no deps.edn."
+  (let* ((default-directory dir)
+         (project
+          (if (file-exists-p (expand-file-name "deps.edn" dir))
+              (with-temp-buffer
+                (let ((status (call-process clotran-deps-program nil t nil)))
+                  (unless (eq status 0)
+                    (error "clotran-deps failed: %s" (string-trim (buffer-string))))
+                  (string-trim (buffer-string))))
+            "")))
+    (mapconcat #'identity
+               (delq nil (list (unless (string-empty-p project) project)
+                               (expand-file-name "src" clotran-nrepl-dir)))
+               ":")))
+
+(defun clotran-jack-in ()
+  "Start clotran with an nREPL server in this project, and connect CIDER."
   (interactive)
-  (let ((buf (get-buffer-create clotran-buffer-name)))
-    (unless (comint-check-proc buf)
-      (with-current-buffer buf
-        (make-comint-in-buffer "clotran" buf (clotran--find-program))
-        (clotran-repl-mode)))
-    (pop-to-buffer buf)))
-
-(defun clotran--repl-buffer ()
-  (or (get-buffer clotran-buffer-name)
-      (user-error "No clotran REPL running; M-x run-clotran first")))
-
-(defun clotran-switch-to-repl ()
-  "Switch to the clotran REPL buffer."
-  (interactive)
-  (pop-to-buffer (clotran--repl-buffer)))
-
-(defun clotran--send (line)
-  "Send LINE (one already-complete line of text) to the REPL."
-  (let ((buf (clotran--repl-buffer)))
-    (comint-send-string (get-buffer-process buf) (concat line "\n"))
-    (display-buffer buf)))
-
-(defun clotran--send-via-load-file (code)
-  "Write CODE to a temp file and have the REPL `load-file' it.
-Sidesteps clotran-bin's one-line-per-form stdin reader for anything
-spanning more than one line -- see the commentary at the top of this
-file."
-  (let ((file (make-temp-file "clotran-eval" nil ".clj")))
-    (with-temp-file file (insert code))
-    (clotran--send (format "(load-file %S)" file))))
-
-(defun clotran-eval-region (start end)
-  "Evaluate the region in the clotran REPL."
-  (interactive "r")
-  (clotran--send-via-load-file (buffer-substring-no-properties start end)))
-
-(defun clotran-eval-buffer ()
-  "Evaluate the whole current buffer in the clotran REPL."
-  (interactive)
-  (clotran-eval-region (point-min) (point-max)))
-
-(defun clotran-eval-defun ()
-  "Evaluate the top-level form at point in the clotran REPL."
-  (interactive)
-  (save-excursion
-    (end-of-defun)
-    (let ((end (point)))
-      (beginning-of-defun)
-      (clotran-eval-region (point) end))))
-
-(defun clotran-eval-last-sexp ()
-  "Evaluate the sexp before point in the clotran REPL."
-  (interactive)
-  (clotran-eval-region (save-excursion (backward-sexp) (point)) (point)))
-
-(defun clotran-load-file (file)
-  "Load FILE into the running clotran REPL.
-Reloading is just calling this again: if FILE opens with its own
-\(in-ns \\='some.ns) form, load-file naturally (re)switches to that
-namespace when it runs, same as real Clojure's `load'/`ns' interplay
--- there's no separate namespace bookkeeping to do here."
-  (interactive (list (or buffer-file-name (read-file-name "Load file: "))))
-  (clotran--send (format "(load-file %S)" (expand-file-name file))))
-
-(defvar clotran-minor-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-z") #'clotran-switch-to-repl)
-    (define-key map (kbd "C-x C-e") #'clotran-eval-last-sexp)
-    (define-key map (kbd "C-M-x")   #'clotran-eval-defun)
-    (define-key map (kbd "C-c C-r") #'clotran-eval-region)
-    (define-key map (kbd "C-c C-b") #'clotran-eval-buffer)
-    (define-key map (kbd "C-c C-l") #'clotran-load-file)
-    map)
-  "Keymap for `clotran-minor-mode' (bindings mirror cider/inf-clojure).")
-
-;;;###autoload
-(define-minor-mode clotran-minor-mode
-  "Minor mode adding clotran REPL interaction to a `clojure-mode' buffer."
-  :lighter " Clotran"
-  :keymap clotran-minor-mode-map)
+  (let* ((dir (clotran--project-dir))
+         (path (clotran--source-path dir))
+         (driver (make-temp-file "clotran-jack-in" nil ".clj"
+                                 (concat "(require (quote clotran.nrepl.server))\n"
+                                         "(println (str \"clotran nREPL server on port \" (:port (clotran.nrepl.server/start! {:port 0}))))\n"
+                                         "(flush)\n@(promise)\n")))
+         (buffer (generate-new-buffer (format "*clotran %s*" (file-name-nondirectory (directory-file-name dir)))))
+         (process-environment (cons (concat "CLOTRAN_PATH=" path) process-environment))
+         (default-directory dir)
+         ;; pipes, not a pty: nothing here is a terminal for clotran to edit
+         (process-connection-type nil)
+         (proc (start-process "clotran" buffer clotran-program driver)))
+    (set-process-filter
+     proc
+     (lambda (p out)
+       (with-current-buffer (process-buffer p)
+         (goto-char (point-max))
+         (insert out)
+         (when (and (not (process-get p 'clotran-connected))
+                    (save-excursion
+                      (goto-char (point-min))
+                      (re-search-forward "clotran nREPL server on port \\([0-9]+\\)" nil t)))
+           (let ((port (string-to-number (match-string 1))))
+             (process-put p 'clotran-connected t)
+             (message "clotran: server on port %d, connecting CIDER" port)
+             (cider-connect-clj (list :host "localhost" :port port :project-dir dir)))))))
+    (message "clotran: starting in %s" dir)
+    proc))
 
 (provide 'clotran-mode)
 ;;; clotran-mode.el ends here
