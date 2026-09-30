@@ -18,11 +18,9 @@ interpreted, and is compiled to native code in the background.
 
 ## A project, quickly
 
-    mkdir -p hello/src/hello && cd hello
-    echo '{}' > deps.edn
-    echo '(ns hello.core) (defn greet [n] (str "hello, " n))' > src/hello/core.cljf
+    clotran new hello
 
-then open `src/hello/core.cljf` in Emacs and `M-x cider-jack-in`.
+then open `hello/src/hello/core.cljf` in Emacs and `M-x cider-jack-in`.
 
 ## Setup
 
