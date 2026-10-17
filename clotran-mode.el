@@ -1,9 +1,9 @@
 ;;; clotran-mode.el --- Emacs for clotran: .cljf files and CIDER jack-in  -*- lexical-binding: t; -*-
 
-;; clotran is Clojure hosted on Fortran (~/jborden/clotran). Its source
+;; clotran is Clojure hosted on Fortran (~/clotran/clotran). Its source
 ;; files are .cljf: Clojure's syntax, so they open in clojure-mode, and
 ;; CIDER works in them. CIDER talks to clotran through the nREPL server
-;; in ~/jborden/clotran-nrepl, which is what `clotran-jack-in' starts.
+;; in ~/clotran/clotran-nrepl, which is what `clotran-jack-in' starts.
 ;;
 ;;   (load "/path/to/clotran-mode/clotran-mode.el")
 ;;
@@ -20,7 +20,7 @@
   "clotran: Clojure hosted on Fortran."
   :group 'languages)
 
-(defcustom clotran-nrepl-dir (expand-file-name "~/jborden/clotran-nrepl")
+(defcustom clotran-nrepl-dir (expand-file-name "~/clotran/clotran-nrepl")
   "The clotran-nrepl checkout whose bin/clotran-nrepl CIDER's jack-in runs."
   :type 'directory)
 

@@ -31,11 +31,11 @@ then open `hello/src/hello/core.cljf` in Emacs and `M-x cider-jack-in`.
 
 ## Setup
 
-    (load "/Users/james/jborden/clotran-mode/clotran-mode.el")
+    (load "/Users/james/clotran/clotran-mode/clotran-mode.el")
 
 with `clotran` and `clotran-deps` on PATH (`make install` in each), and
 `clotran-nrepl-dir` pointing at the clotran-nrepl checkout (default
-`~/jborden/clotran-nrepl`).
+`~/clotran/clotran-nrepl`).
 
 ## Tests
 
