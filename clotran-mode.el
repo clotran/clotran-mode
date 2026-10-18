@@ -74,6 +74,47 @@ server through eglot and a REPL of clotran's own.
 ;;;###autoload
 (add-to-list 'interpreter-mode-alist '("clotran" . clotran-mode))
 
+;;; a package's Fortran: C-c C-k there rebuilds the package
+
+(defvar clotran-fortran-mode-map
+  (let ((m (make-sparse-keymap)))
+    (define-key m (kbd "C-c C-z") #'clotran-jack-in)
+    (define-key m (kbd "C-c C-k") #'clotran-load-buffer)
+    m))
+
+(define-minor-mode clotran-fortran-mode
+  "In a Fortran buffer of a clotran package (a package.edn beside it or
+above): C-c C-k saves the file and loads it -- the package is built again
+from its sources, its routines replaced, its module state fresh, and the
+REPL says so."
+  :lighter " clotran"
+  :keymap clotran-fortran-mode-map)
+
+(defun clotran--fortran-setup ()
+  (when (and buffer-file-name (locate-dominating-file buffer-file-name "package.edn"))
+    (clotran-fortran-mode 1)))
+
+(add-hook 'f90-mode-hook #'clotran--fortran-setup)
+(add-hook 'fortran-mode-hook #'clotran--fortran-setup)
+
+;;; the debugger, through dape
+
+;; dape (an Emacs DAP client) gets a configuration: M-x dape, then
+;; `clotran' -- the file in the buffer debugged under `clotran dap', which
+;; drives lldb-dap underneath; a breakpoint in a package's Fortran stops
+;; with its source line.
+(with-eval-after-load 'dape
+  (add-to-list 'dape-configs
+               `(clotran
+                 modes (clotran-mode f90-mode fortran-mode)
+                 command ,clotran-program
+                 command-args ("dap")
+                 command-cwd dape-command-cwd
+                 :type "clotran"
+                 :request "launch"
+                 :program dape-buffer-default
+                 :cwd dape-cwd)))
+
 ;;; the language server, through eglot
 
 (defun clotran--lsp-contact (_interactive)

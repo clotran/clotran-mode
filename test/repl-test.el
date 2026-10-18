@@ -73,9 +73,29 @@
       (check "an error is shown, not raised"
              (clotran-eval-string "(/ 1 0)") nil)
       (check "C-c C-K compiles the file" (call-interactively #'clotran-compile-buffer) 'installed)
+      ;; a Fortran package in the project: C-c C-k in its .f90 builds it,
+      ;; and again after an edit, replacing the routine
+      (let ((pkg (expand-file-name "src/pkg" proj)))
+        (make-directory pkg t)
+        (with-temp-file (expand-file-name "package.edn" pkg) (insert "{:name \"tpkg\" :sources [\"tpkg.f90\"]}"))
+        (with-temp-file (expand-file-name "tpkg.f90" pkg)
+          (insert "module tpkg\n  implicit none\ncontains\n  real(8) function twice(x)\n    real(8), intent(in) :: x\n    twice = 2 * x\n  end function twice\nend module tpkg\n"))
+        (with-current-buffer (find-file-noselect (expand-file-name "tpkg.f90" pkg))
+          (check "a .f90 of a package gets clotran-fortran-mode, C-c C-k bound"
+                 (list clotran-fortran-mode (key-binding (kbd "C-c C-k"))) '(t clotran-load-buffer))
+          (call-interactively #'clotran-load-buffer)
+          (check "C-c C-k in the .f90 builds the package" (clotran-eval-string "(tpkg.raw/twice 21.0)") "42.0")
+          (goto-char (point-min)) (search-forward "twice = 2") (replace-match "twice = 3")
+          (with-current-buffer clotran-output-buffer (erase-buffer))
+          (call-interactively #'clotran-load-buffer)
+          (check "and again after an edit: rebuilt, replaced, and said so"
+                 (list (clotran-eval-string "(tpkg.raw/twice 21.0)")
+                       (with-current-buffer clotran-output-buffer (buffer-string)))
+                 '("63.0" "clotran: tpkg.raw rebuilt from its sources: 1 routines replaced, module state fresh\n"))))
       (check "and the compiled function is the one that runs"
              (clotran-eval-string "[(clojure.string/includes? (pr-str app.main/twice-answer) \"#<compiled\") (app.main/twice-answer)]")
              "[true 84]")
+      (set-buffer buf)
       (if (and (require 'eglot nil t) (fboundp 'eglot))
           (progn
             (check "eglot knows how to start clotran lsp for a clotran buffer"

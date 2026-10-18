@@ -20,6 +20,14 @@ on Fortran -- with nothing to install but clojure-mode:
   compiles it to native code, waiting for the build and saying how it
   went. What is printed goes to `*clotran*`; `C-c C-q` disconnects.
 
+- in a package's `.f90` (a `package.edn` beside it or above),
+  `clotran-fortran-mode` binds `C-c C-k` too: the package is built
+  again from its sources, its routines replaced, its module state fresh,
+  and the REPL says so;
+- the debugger, through `dape` when it is installed: `M-x dape` offers
+  `clotran`, which debugs the buffer's file under `clotran dap` (lldb-dap
+  underneath); a breakpoint in a package's Fortran stops with its line.
+
 CIDER, when it is installed, works in a clotran buffer as it is: its
 `M-x cider-jack-in` runs `clotran nrepl` too, and its keys bind over
 clotran-mode's. Not a fork of CIDER, and not needed.
