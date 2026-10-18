@@ -64,3 +64,7 @@ clotran does.
 This repository first held a comint mode for clotran-bin, written before
 clotran had an nREPL server; then CIDER's jack-in over clotran-nrepl;
 now its own client and eglot (clotran's PLAN step 36).
+
+## License
+
+MIT (LICENSE).

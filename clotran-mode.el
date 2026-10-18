@@ -1,6 +1,8 @@
 ;;; clotran-mode.el --- Major mode for clotran: .cljf, its LSP and REPL  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 James Borden
 ;; Author: James Borden
+;; SPDX-License-Identifier: MIT
 ;; URL: https://github.com/clotran/clotran-mode
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "29.1") (clojure-mode "5.0") (dape "0.14"))
