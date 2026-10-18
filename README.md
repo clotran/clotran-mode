@@ -24,8 +24,9 @@ on Fortran -- with nothing to install but clojure-mode:
   `clotran-fortran-mode` binds `C-c C-k` too: the package is built
   again from its sources, its routines replaced, its module state fresh,
   and the REPL says so;
-- the debugger, through `dape` when it is installed: `M-x dape` offers
-  `clotran`, which debugs the buffer's file under `clotran dap` (lldb-dap
+- the debugger, through `dape` (installed with clotran-mode):
+  `M-x dape` offers `clotran`,
+  which debugs the buffer's file under `clotran dap` (lldb-dap
   underneath); a breakpoint in a package's Fortran stops with its line.
 
 CIDER, when it is installed, works in a clotran buffer as it is: its

@@ -31,6 +31,17 @@ if "$emacs" --batch --eval "(progn (package-initialize) (require (quote cider)))
 else
   echo "(no CIDER in this Emacs: its check is skipped)"
 fi
+if "$emacs" --batch --eval "(progn (package-initialize) (require (quote dape)))" >/dev/null 2>&1; then
+  echo "--- the debugger's configuration, for dape ---"
+  PATH=/usr/bin:/bin CLOTRAN_MODE_DIR="$here" "$emacs" --batch \
+    --eval "(setq clotran-program \"${CLOTRAN:-$here/../clotran}/clotran\")" \
+    -l "$here/test/dape-test.el" >"$out" 2>&1
+  st=$?
+  grep '^ok\|^FAIL\|^  ' "$out"
+  [ $st -eq 0 ] || { cat "$out" | tail -20; echo "CLOTRAN-MODE TESTS FAILED"; exit 1; }
+else
+  echo "(no dape in this Emacs: its check is skipped)"
+fi
 # INSTALL=1: M-x clotran-install from nothing -- a scratch HOME, no clotran
 # on PATH -- downloading the release (test/install-test.el)
 if [ "${INSTALL:-0}" = 1 ]; then

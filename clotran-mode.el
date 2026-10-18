@@ -3,7 +3,7 @@
 ;; Author: James Borden
 ;; URL: https://github.com/clotran/clotran-mode
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "29.1") (clojure-mode "5.0"))
+;; Package-Requires: ((emacs "29.1") (clojure-mode "5.0") (dape "0.14"))
 ;; Keywords: languages, lisp, tools
 
 ;;; Commentary:
@@ -32,6 +32,7 @@
 (require 'clojure-mode)
 (require 'eglot)
 (require 'project)
+(require 'dape)
 (require 'cl-lib)
 (require 'subr-x)
 
@@ -50,7 +51,6 @@ macOS Dock."
 Only when eglot is available."
   :type 'boolean)
 
-(defvar dape-configs)
 (declare-function cider-connected-p "cider-connection")
 (declare-function cider-nrepl-sync-request:eval "cider-client")
 (declare-function nrepl-dict-get "nrepl-dict")
@@ -175,17 +175,17 @@ replaced, its module state fresh, and the REPL says so."
 ;; `clotran' -- the file in the buffer debugged under `clotran dap', which
 ;; drives lldb-dap underneath; a breakpoint in a package's Fortran stops
 ;; with its source line.
-(with-eval-after-load 'dape
-  (add-to-list 'dape-configs
-               `(clotran
-                 modes (clotran-mode f90-mode fortran-mode)
-                 command ,(clotran--command)
-                 command-args ("dap")
-                 command-cwd dape-command-cwd
-                 :type "clotran"
-                 :request "launch"
-                 :program dape-buffer-default
-                 :cwd dape-cwd)))
+(add-to-list 'dape-configs
+             '(clotran
+               modes (clotran-mode f90-mode fortran-mode)
+               ;; a function, so dape finds clotran when the session starts
+               command clotran--command
+               command-args ("dap")
+               command-cwd dape-command-cwd
+               :type "clotran"
+               :request "launch"
+               :program dape-buffer-default
+               :cwd dape-cwd))
 
 ;;; the language server, through eglot
 
