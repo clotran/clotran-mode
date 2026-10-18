@@ -99,7 +99,7 @@
       (if (and (require 'eglot nil t) (fboundp 'eglot))
           (progn
             (check "eglot knows how to start clotran lsp for a clotran buffer"
-                   (funcall (alist-get 'clotran-mode eglot-server-programs) nil) (list clotran-program "lsp"))
+                   (funcall (alist-get 'clotran-mode eglot-server-programs) nil) (list (expand-file-name clotran-program) "lsp"))
             (setq eglot-sync-connect t eglot-connect-timeout 90)
             (let ((server (eglot 'clotran-mode (project-current) 'eglot-lsp-server (clotran--lsp-contact nil) "clojure")))
               (check "eglot connects to it" (plist-get (eglot--server-info server) :name) "clotran-ide")

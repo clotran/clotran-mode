@@ -1,8 +1,16 @@
-;;; clotran-mode.el --- Emacs for clotran: .cljf files, the language server, a REPL  -*- lexical-binding: t; -*-
+;;; clotran-mode.el --- Major mode for clotran: .cljf, its LSP and REPL  -*- lexical-binding: t; -*-
 
-;; clotran is Clojure hosted on Fortran (github.com/clotran/clotran). Its
+;; Author: James Borden
+;; URL: https://github.com/clotran/clotran-mode
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "29.1") (clojure-mode "5.0"))
+;; Keywords: languages, lisp, tools
+
+;;; Commentary:
+
+;; clotran is Clojure hosted on Fortran (github.com/clotran/clotran).  Its
 ;; source files are .cljf: Clojure's syntax, so `clotran-mode' is
-;; `clojure-mode' derived, and what reads Clojure reads them. On top of
+;; `clojure-mode' derived, and what reads Clojure reads them.  On top of
 ;; it, two things of clotran's own, neither needing CIDER:
 ;;
 ;; - the language server, `clotran lsp' (github.com/clotran/clotran-ide),
@@ -22,27 +30,85 @@
 ;;; Code:
 
 (require 'clojure-mode)
+(require 'eglot)
+(require 'project)
 (require 'cl-lib)
 (require 'subr-x)
 
 (defgroup clotran nil
-  "clotran: Clojure hosted on Fortran."
+  "Settings for clotran, Clojure hosted on Fortran."
   :group 'languages)
 
 (defcustom clotran-program "clotran"
-  "The clotran command. A full path when Emacs's PATH has none, as an
-Emacs started from the macOS Dock."
+  "The clotran command.
+A full path when Emacs's PATH has none, as an Emacs started from the
+macOS Dock."
   :type 'string)
 
 (defcustom clotran-eglot-auto t
-  "Start eglot, with `clotran lsp', in every clotran buffer when eglot is
-available."
+  "Non-nil means start eglot, with `clotran lsp', in every clotran buffer.
+Only when eglot is available."
   :type 'boolean)
+
+(defvar dape-configs)
+(declare-function cider-connected-p "cider-connection")
+(declare-function cider-nrepl-sync-request:eval "cider-client")
+(declare-function nrepl-dict-get "nrepl-dict")
+
+;;; finding clotran, and installing it
+
+(defun clotran--program ()
+  "Return the clotran command as a full path, or nil when there is none.
+`clotran-program' found on variable `exec-path', else where clotran's
+install scripts put it (an Emacs started from the Dock or the Start menu
+often has no ~/.local/bin on its PATH)."
+  (or (executable-find clotran-program)
+      (cl-find-if #'file-executable-p
+                  (if (eq system-type 'windows-nt)
+                      (list (expand-file-name "Programs/clotran/bin/clotran.cmd" (getenv "LOCALAPPDATA")))
+                    (list (expand-file-name "~/.local/bin/clotran"))))))
+
+(defun clotran--command ()
+  "Return the command to run: found, or `clotran-program' as given."
+  (or (clotran--program) clotran-program))
+
+(defconst clotran--install-command
+  (if (eq system-type 'windows-nt)
+      '("powershell" "-NoProfile" "-ExecutionPolicy" "Bypass" "-Command"
+        "irm https://raw.githubusercontent.com/clotran/clotran/main/install.ps1 | iex")
+    '("sh" "-c" "curl -fsSL https://raw.githubusercontent.com/clotran/clotran/main/install.sh | sh"))
+  "Command that runs clotran's own install script, as its README gives it.")
+
+;;;###autoload
+(defun clotran-install ()
+  "Install clotran with its install script, then start eglot in clotran buffers.
+The script fetches the release for this machine, checks it against its
+SHA256SUMS and puts it where a terminal finds it too; its output goes
+in *clotran install*."
+  (interactive)
+  (let ((buf (get-buffer-create "*clotran install*")))
+    (with-current-buffer buf (erase-buffer))
+    (display-buffer buf)
+    (message "clotran: installing...")
+    (make-process
+     :name "clotran install" :buffer buf :command clotran--install-command :noquery t
+     :sentinel (lambda (p _event)
+                 (unless (process-live-p p)
+                   (if (and (zerop (process-exit-status p)) (clotran--program))
+                       (progn
+                         (message "clotran: installed, %s" (clotran--program))
+                         (when (and clotran-eglot-auto (fboundp 'eglot-ensure))
+                           (dolist (b (buffer-list))
+                             (with-current-buffer b
+                               (when (and (derived-mode-p 'clotran-mode) (buffer-file-name))
+                                 (eglot-ensure))))))
+                     (message "clotran: the install failed; *clotran install* says why")))))))
 
 ;;; .cljf files are clotran buffers
 
 (defun clotran--nrepl-command ()
-  (concat (shell-quote-argument clotran-program) " nrepl"))
+  "Return the shell command to run `clotran nrepl'."
+  (concat (shell-quote-argument (clotran--command)) " nrepl"))
 
 (defvar clotran-mode-map
   (let ((m (make-sparse-keymap)))
@@ -55,19 +121,22 @@ available."
     (define-key m (kbd "C-c C-S-k") #'clotran-compile-buffer)
     (define-key m (kbd "C-c C-q") #'clotran-quit)
     m)
-  "Keys of `clotran-mode': the REPL of its own. CIDER's minor mode, when
-it is on, binds over them.")
+  "Keys of `clotran-mode': the REPL of its own.
+CIDER's minor mode, when it is on, binds over them.")
 
 ;;;###autoload
 (define-derived-mode clotran-mode clojure-mode "clotran"
-  "Major mode for clotran's .cljf files: `clojure-mode', with the language
-server through eglot and a REPL of clotran's own.
+  "Major mode for clotran's .cljf files.
+It is `clojure-mode', with the language server through eglot and a REPL
+of clotran's own.
 
 \\{clotran-mode-map}"
   ;; CIDER's jack-in, when CIDER is there, runs clotran nrepl
   (setq-local cider-jack-in-cmd (clotran--nrepl-command))
-  (when (and clotran-eglot-auto (fboundp 'eglot-ensure) (buffer-file-name))
-    (eglot-ensure)))
+  (if (not (clotran--program))
+      (message "clotran is not installed: M-x clotran-install installs it")
+    (when (and clotran-eglot-auto (fboundp 'eglot-ensure) (buffer-file-name))
+      (eglot-ensure))))
 
 ;;;###autoload
 (add-to-list 'auto-mode-alist '("\\.cljf\\'" . clotran-mode))
@@ -80,17 +149,20 @@ server through eglot and a REPL of clotran's own.
   (let ((m (make-sparse-keymap)))
     (define-key m (kbd "C-c C-z") #'clotran-jack-in)
     (define-key m (kbd "C-c C-k") #'clotran-load-buffer)
-    m))
+    m)
+  "Keys of `clotran-fortran-mode'.")
 
 (define-minor-mode clotran-fortran-mode
-  "In a Fortran buffer of a clotran package (a package.edn beside it or
-above): C-c C-k saves the file and loads it -- the package is built again
-from its sources, its routines replaced, its module state fresh, and the
-REPL says so."
+  "Minor mode for a Fortran buffer of a clotran package.
+The package has a package.edn beside the file or above it.
+\\<clotran-fortran-mode-map>\\[clotran-load-buffer] saves the file and
+loads it -- the package is built again from its sources, its routines
+replaced, its module state fresh, and the REPL says so."
   :lighter " clotran"
   :keymap clotran-fortran-mode-map)
 
 (defun clotran--fortran-setup ()
+  "Turn on `clotran-fortran-mode' in a clotran package's Fortran."
   (when (and buffer-file-name (locate-dominating-file buffer-file-name "package.edn"))
     (clotran-fortran-mode 1)))
 
@@ -107,7 +179,7 @@ REPL says so."
   (add-to-list 'dape-configs
                `(clotran
                  modes (clotran-mode f90-mode fortran-mode)
-                 command ,clotran-program
+                 command ,(clotran--command)
                  command-args ("dap")
                  command-cwd dape-command-cwd
                  :type "clotran"
@@ -118,17 +190,14 @@ REPL says so."
 ;;; the language server, through eglot
 
 (defun clotran--lsp-contact (_interactive)
-  "How eglot starts the server: `clotran lsp', in the project's directory."
-  (list clotran-program "lsp"))
+  "Return the server command for eglot: `clotran lsp', in the project's directory."
+  (list (clotran--command) "lsp"))
 
-(with-eval-after-load 'eglot
-  (add-to-list 'eglot-server-programs '(clotran-mode . clotran--lsp-contact)))
+(add-to-list 'eglot-server-programs '(clotran-mode . clotran--lsp-contact))
 
 ;; a directory with a deps.edn is a project, as it is for clotran: eglot
 ;; starts the server there, where `clotran lsp' reads the project's path
-(with-eval-after-load 'project
-  (when (boundp 'project-vc-extra-root-markers)
-    (add-to-list 'project-vc-extra-root-markers "deps.edn")))
+(add-to-list 'project-vc-extra-root-markers "deps.edn")
 
 ;;; an nREPL client, the base operations only
 ;;
@@ -139,8 +208,8 @@ REPL says so."
 ;; next chunk.
 
 (defun clotran--bencode (x)
-  "X -- a string, an integer, a list, or an alist with string keys -- as
-bencode, a unibyte string."
+  "Return X as bencode, a unibyte string.
+X is a string, an integer, a list, or an alist with string keys."
   (cond
    ((stringp x) (let ((b (encode-coding-string x 'utf-8)))
                   (concat (number-to-string (length b)) ":" b)))
@@ -153,9 +222,9 @@ bencode, a unibyte string."
    (t (error "clotran: no bencode for %S" x))))
 
 (defun clotran--bdecode (s pos)
-  "The value in unibyte string S at POS as (VALUE . NEXT-POS), or nil when
-the value is not all there yet. Strings come back decoded from UTF-8,
-dictionaries as alists, lists as lists."
+  "Return the value in unibyte string S at POS as (VALUE . NEXT-POS).
+Nil when the value is not all there yet.  Strings come back decoded
+from UTF-8, dictionaries as alists, lists as lists."
   (when (< pos (length s))
     (let ((c (aref s pos)))
       (cond
@@ -187,11 +256,14 @@ dictionaries as alists, lists as lists."
 (defvar clotran--session nil "The nREPL session on `clotran--conn'.")
 (defvar clotran--pending (make-hash-table :test 'equal) "Request id -> the function taking each reply.")
 (defvar clotran--incoming "" "Bytes received and not yet decoded.")
-(defvar clotran--next-id 0)
+(defvar clotran--next-id 0 "The last request id used.")
 
-(defun clotran--connected-p () (and clotran--conn (process-live-p clotran--conn)))
+(defun clotran--connected-p ()
+  "Return non-nil when connected to an nREPL server."
+  (and clotran--conn (process-live-p clotran--conn)))
 
 (defun clotran--filter (_proc chunk)
+  "Decode CHUNK's whole messages and hand each to its request's function."
   (setq clotran--incoming (concat clotran--incoming chunk))
   (let (r)
     (while (setq r (and (> (length clotran--incoming) 0) (clotran--bdecode clotran--incoming 0)))
@@ -204,8 +276,8 @@ dictionaries as alists, lists as lists."
           (funcall f msg))))))
 
 (defun clotran--send (msg on-reply)
-  "Send MSG, an alist, with an id and the session; ON-REPLY takes each
-reply until one carries status done."
+  "Send MSG, an alist, with an id and the session.
+ON-REPLY takes each reply until one carries status done."
   (unless (clotran--connected-p) (user-error "clotran: not connected -- C-c C-z (clotran-jack-in) first"))
   (let ((id (number-to-string (cl-incf clotran--next-id))))
     (puthash id on-reply clotran--pending)
@@ -216,8 +288,9 @@ reply until one carries status done."
     id))
 
 (defun clotran--request-sync (msg &optional secs)
-  "Send MSG and wait up to SECS (30) for its replies, combined: the values
-in order under \"value\", out and err concatenated, every status."
+  "Send MSG and wait up to SECS (30) for its replies, combined.
+The values in order under \"value\", out and err concatenated, every
+status."
   (let ((replies nil) (done nil))
     (clotran--send msg (lambda (m) (push m replies) (when (member "done" (cdr (assoc "status" m))) (setq done t))))
     (let ((n 0))
@@ -249,8 +322,8 @@ in order under \"value\", out and err concatenated, every status."
   clotran--conn)
 
 (defun clotran--project-root ()
-  "The directory with the deps.edn above this buffer's file, else its
-directory, else `default-directory'."
+  "Return the directory with the deps.edn above this buffer's file.
+Else the file's directory, else `default-directory'."
   (or (and buffer-file-name (locate-dominating-file buffer-file-name "deps.edn"))
       (and buffer-file-name (file-name-directory buffer-file-name))
       default-directory))
@@ -263,10 +336,10 @@ Connected already: say so."
       (message "clotran: connected (C-c C-q quits)")
     (let* ((default-directory (clotran--project-root))
            (proc (make-process :name "clotran nrepl" :buffer " *clotran nrepl*"
-                               :command (list clotran-program "nrepl") :connection-type 'pipe
+                               :command (list (clotran--command) "nrepl") :connection-type 'pipe
                                :coding 'utf-8 :noquery t)))
       (setq clotran--server proc)
-      (message "clotran: starting %s nrepl in %s..." clotran-program default-directory)
+      (message "clotran: starting %s nrepl in %s..." (clotran--command) default-directory)
       (set-process-filter
        proc (lambda (p chunk)
               (when (buffer-live-p (process-buffer p))
@@ -293,14 +366,15 @@ Connected already: say so."
 (defvar clotran-output-buffer "*clotran*" "Where what evaluations print goes.")
 
 (defun clotran--append-output (text)
+  "Append TEXT to `clotran-output-buffer'."
   (when (and text (> (length text) 0))
     (with-current-buffer (get-buffer-create clotran-output-buffer)
       (goto-char (point-max))
       (insert text))))
 
 (defun clotran--show (r)
-  "An evaluation's combined reply R in the echo area and the output
-buffer; the last value, as a string."
+  "Show an evaluation's combined reply R in the echo area and the output buffer.
+Return the last value, as a string."
   (clotran--append-output (cdr (assoc "out" r)))
   (clotran--append-output (cdr (assoc "err" r)))
   (let ((err (cdr (assoc "err" r)))
@@ -311,14 +385,16 @@ buffer; the last value, as a string."
     (car (last vals))))
 
 (defun clotran--ns-loaded-p (ns)
-  "Whether the server has namespace NS: evaluating in one it does not
-have fails, as clj's nREPL does, on the first symbol."
+  "Return non-nil when the server has namespace NS.
+Evaluating in one it does not have fails, as clj's nREPL does, on the
+first symbol."
   (equal '("true") (cdr (assoc "value" (clotran--request-sync `(("op" . "eval") ("code" . ,(format "(some? (find-ns '%s))" ns))))))))
 
 (defun clotran-eval-string (code &optional ns)
-  "Evaluate CODE in NS (the buffer's, found by `clojure-find-ns') and
-show the answer; the last value, as a string. A namespace the server has
-not loaded yet is said so, and CODE runs in user: C-c C-k loads the file."
+  "Evaluate CODE in NS and show the answer; return the last value, a string.
+NS defaults to the buffer's, found by `clojure-find-ns'.  A namespace
+the server has not loaded yet is said so, and CODE runs in user:
+\\<clotran-mode-map>\\[clotran-load-buffer] loads the file."
   (let* ((ns (or ns (ignore-errors (clojure-find-ns))))
          (ns (cond ((null ns) nil)
                    ((clotran--ns-loaded-p ns) ns)
@@ -356,8 +432,9 @@ not loaded yet is said so, and CODE runs in user: C-c C-k loads the file."
     r))
 
 (defun clotran--eval-sync (code &optional secs)
-  "CODE evaluated through this file's client, or, when CIDER holds the
-connection instead, through CIDER's; the combined reply either way."
+  "Evaluate CODE, waiting up to SECS, and return the combined reply.
+Through this file's client, or, when CIDER holds the connection
+instead, through CIDER's."
   (cond ((clotran--connected-p)
          (clotran--request-sync `(("op" . "eval") ("code" . ,code)) secs))
         ((and (fboundp 'cider-connected-p) (cider-connected-p))
@@ -369,9 +446,9 @@ connection instead, through CIDER's; the combined reply either way."
         (t (user-error "clotran: not connected -- C-c C-z (clotran-jack-in) first"))))
 
 (defun clotran-compile-buffer ()
-  "Save this file, load it into clotran, and compile it to native code,
-waiting for the build: the compiled functions replace the interpreted
-ones. Says in the minibuffer what came of it, and answers the build's
+  "Save this file, load it into clotran, and compile it to native code.
+Wait for the build: the compiled functions replace the interpreted
+ones.  Say in the minibuffer what came of it, and return the build's
 state (`installed', `none', `failed', ...)."
   (interactive)
   (unless buffer-file-name (user-error "clotran: this buffer has no file to compile"))

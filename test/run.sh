@@ -31,4 +31,16 @@ if "$emacs" --batch --eval "(progn (package-initialize) (require (quote cider)))
 else
   echo "(no CIDER in this Emacs: its check is skipped)"
 fi
+# INSTALL=1: M-x clotran-install from nothing -- a scratch HOME, no clotran
+# on PATH -- downloading the release (test/install-test.el)
+if [ "${INSTALL:-0}" = 1 ]; then
+  echo "--- M-x clotran-install, from nothing ---"
+  home=$(mktemp -d) || exit 1
+  REAL_HOME=$HOME HOME=$home LOCALAPPDATA=$home/AppData/Local PATH=/usr/bin:/bin CLOTRAN_MODE_DIR="$here" "$emacs" --batch \
+    -l "$here/test/install-test.el" >"$out" 2>&1
+  st=$?
+  grep '^ok\|^FAIL\|^  ' "$out"
+  rm -rf "$home"
+  [ $st -eq 0 ] || { echo "CLOTRAN-MODE TESTS FAILED"; exit 1; }
+fi
 echo "CLOTRAN-MODE TESTS PASSED"
