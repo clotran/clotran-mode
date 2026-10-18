@@ -29,7 +29,7 @@
   (with-temp-file (expand-file-name "src/app/main.cljf" proj)
     (insert "(ns app.main (:require [dep.core]))\n(defn twice-answer [] (* 2 dep.core/answer))\n"))
   (let ((buf (find-file-noselect (expand-file-name "src/app/main.cljf" proj))))
-    (check "a .cljf file opens in clojure-mode" (with-current-buffer buf major-mode) 'clojure-mode)
+    (check "a .cljf file opens in clotran-mode, a clojure-mode" (with-current-buffer buf (list major-mode (and (derived-mode-p 'clojure-mode) t))) '(clotran-mode t))
     (with-current-buffer buf (cider-jack-in-clj nil))
     (check "cider-jack-in, in a .cljf buffer, starts clotran and connects" (not (null (wait-for #'repl-buffer 60))) t)
     (with-current-buffer (repl-buffer)
@@ -43,7 +43,7 @@
       nil)
     (with-current-buffer buf
       (check "a .cljf buffer is in clotran-mode, C-c C-K bound to compiling it"
-             (list clotran-mode (key-binding (kbd "C-c C-S-k"))) '(t clotran-compile-buffer))
+             (list major-mode (key-binding (kbd "C-c C-S-k"))) '(clotran-mode clotran-compile-buffer))
       (check "C-c C-K compiles the file" (call-interactively (key-binding (kbd "C-c C-S-k"))) 'installed))
     (with-current-buffer (repl-buffer)
       (check "and the compiled function is the one that runs"
