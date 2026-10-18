@@ -1,7 +1,7 @@
 # clotran-mode
 
 Emacs for [clotran](https://github.com/clotran/clotran) -- Clojure hosted
-on Fortran -- with nothing to install but clojure-mode:
+on Fortran -- installing clojure-mode and dape with it:
 
 - `.cljf` files open in `clotran-mode`, a `clojure-mode`, so everything
   that reads Clojure reads them;
@@ -40,15 +40,37 @@ clotran-mode's. Not a fork of CIDER, and not needed.
 then open `hello/src/hello/core.cljf` in Emacs: eglot connects, and
 `C-c C-z` starts the REPL.
 
-## Setup
+## Install
 
-    (load "/path/to/clotran-mode/clotran-mode.el")
+Emacs 29.1 or newer. Today, straight from this repository -- Emacs's
+own `package-vc-install`, which installs clojure-mode and dape with it
+from Emacs's default package archives:
 
-with `clotran` installed (`make install`, which brings `clotran-deps`
-and the `tools.edn` that pins clotran-nrepl and clotran-ide).
-`clotran-program` names the command, `"clotran"` by default; give it a
-full path when Emacs's PATH has none, as an Emacs started from the macOS
-Dock. A directory holding a `deps.edn` is a project to project.el
+    M-x package-vc-install RET https://github.com/clotran/clotran-mode RET
+
+or, in an init file (Emacs 30):
+
+    (use-package clotran-mode
+      :vc (:url "https://github.com/clotran/clotran-mode" :rev :newest))
+
+Then clotran itself, if the machine has none:
+
+    M-x clotran-install
+
+runs clotran's install script -- the release for this machine, checked
+against its SHA256SUMS, into `~/.local` (on Windows
+`%LOCALAPPDATA%\Programs\clotran`) -- and starts eglot in the clotran
+buffers already open. clotran-mode finds the command on `exec-path` or
+where that script puts it, so an Emacs started from the macOS Dock needs
+no PATH set; `clotran-program` names another.
+
+**MELPA:** clotran-mode is ready for MELPA (the recipe builds, and the
+package installs and loads), which takes a package once its repository
+has been public for a month: from 2026-11-17. Then it is
+
+    M-x package-install RET clotran-mode RET
+
+A directory holding a `deps.edn` is a project to project.el
 (`project-vc-extra-root-markers`), so eglot starts the server there, as
 clotran does.
 
