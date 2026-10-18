@@ -2,6 +2,8 @@
 
 ;; Copyright (C) 2026 James Borden
 ;; Author: James Borden
+;; Assisted-by: Claude:claude-fable-5-1
+;; Assisted-by: Claude:claude-opus-5-5
 ;; SPDX-License-Identifier: MIT
 ;; URL: https://github.com/clotran/clotran-mode
 ;; Version: 0.1.0
