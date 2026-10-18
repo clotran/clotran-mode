@@ -6,9 +6,10 @@ stock CIDER, unmodified:
 - `.cljf` files (and scripts run by `clotran`) open in `clojure-mode`, so
   CIDER's commands work in them;
 - CIDER's own `M-x cider-jack-in` works in a `.cljf` buffer: clotran-mode
-  sets the buffer's `cider-jack-in-cmd` to `bin/clotran-nrepl` from
-  [clotran-nrepl](../clotran-nrepl), which resolves the project's
-  `deps.edn` with `clotran-deps` and starts the server; CIDER connects and
+  sets the buffer's `cider-jack-in-cmd` to `clotran nrepl`, which resolves
+  the project's `deps.edn`, starts the server
+  ([clotran-nrepl](../clotran-nrepl), pinned by clotran's own `tools.edn`
+  or a checkout beside it) and writes `.nrepl-port`; CIDER connects and
   owns the process. `M-x clotran-jack-in` does the same from any buffer.
 
 - `C-c C-K` (`clotran-compile-buffer`) saves the file, loads it into
@@ -33,9 +34,10 @@ then open `hello/src/hello/core.cljf` in Emacs and `M-x cider-jack-in`.
 
     (load "/Users/james/clotran/clotran-mode/clotran-mode.el")
 
-with `clotran` and `clotran-deps` on PATH (`make install` in each), and
-`clotran-nrepl-dir` pointing at the clotran-nrepl checkout (default
-`~/clotran/clotran-nrepl`).
+with `clotran` installed (`make install`, which brings `clotran-deps` and
+the `tools.edn` that pins clotran-nrepl). `clotran-program` names the
+command, `"clotran"` by default; give it a full path when Emacs's PATH
+has none, as an Emacs started from the macOS Dock.
 
 ## Tests
 

@@ -20,9 +20,10 @@
   "clotran: Clojure hosted on Fortran."
   :group 'languages)
 
-(defcustom clotran-nrepl-dir (expand-file-name "~/clotran/clotran-nrepl")
-  "The clotran-nrepl checkout whose bin/clotran-nrepl CIDER's jack-in runs."
-  :type 'directory)
+(defcustom clotran-program "clotran"
+  "The clotran command: `clotran nrepl' is what CIDER's jack-in runs. A full
+path when Emacs's PATH has none, as an Emacs started from the macOS Dock."
+  :type 'string)
 
 ;;; .cljf files are Clojure
 
@@ -33,12 +34,14 @@
 
 ;; CIDER's jack-in runs a project's `cider-jack-in-cmd' when one is set, and
 ;; connects when it prints "nREPL server started on port N" -- which
-;; clotran-nrepl's bin/clotran-nrepl does, after resolving the project's
-;; deps.edn with clotran-deps. So in a .cljf buffer plain M-x cider-jack-in
-;; starts clotran, and CIDER owns the process as it would clj's.
+;; `clotran nrepl' does: it resolves the project's deps.edn, starts the
+;; server clotran-nrepl in that clotran (the one pinned by clotran's own
+;; tools.edn, or a checkout beside it) and writes .nrepl-port. So in a .cljf
+;; buffer plain M-x cider-jack-in starts clotran, and CIDER owns the process
+;; as it would clj's.
 
 (defun clotran--nrepl-command ()
-  (expand-file-name "bin/clotran-nrepl" clotran-nrepl-dir))
+  (concat (shell-quote-argument clotran-program) " nrepl"))
 
 (defun clotran-jack-in ()
   "CIDER's jack-in with clotran, from any buffer of a project."
