@@ -33,18 +33,12 @@ CIDER, when it is installed, works in a clotran buffer as it is: its
 `M-x cider-jack-in` runs `clotran nrepl` too, and its keys bind over
 clotran-mode's. Not a fork of CIDER, and not needed.
 
-## A project, quickly
-
-    clotran new hello
-
-then open `hello/src/hello/core.cljf` in Emacs: eglot connects, and
-`C-c C-z` starts the REPL.
-
 ## Install
 
 Emacs 29.1 or newer. Today, straight from this repository -- Emacs's
 own `package-vc-install`, which installs clojure-mode and dape with it
-from Emacs's default package archives:
+from Emacs's default package archives; it needs git (on Windows, Git for
+Windows, on PATH):
 
     M-x package-vc-install RET https://github.com/clotran/clotran-mode RET
 
@@ -52,6 +46,11 @@ or, in an init file (Emacs 30):
 
     (use-package clotran-mode
       :vc (:url "https://github.com/clotran/clotran-mode" :rev :newest))
+
+Without git: it is one file. Save
+https://raw.githubusercontent.com/clotran/clotran-mode/main/clotran-mode.el
+and, after `M-x package-refresh-contents`, `M-x package-install-file` it,
+which installs clojure-mode and dape the same way.
 
 Then clotran itself, if the machine has none:
 
@@ -73,6 +72,13 @@ has been public for a month: from 2026-11-17. Then it is
 A directory holding a `deps.edn` is a project to project.el
 (`project-vc-extra-root-markers`), so eglot starts the server there, as
 clotran does.
+
+## A project, quickly
+
+    clotran new hello
+
+then open `hello/src/hello/core.cljf` in Emacs: eglot connects, and
+`C-c C-z` starts the REPL.
 
 ## Tests
 
