@@ -137,6 +137,8 @@ of clotran's own.
 \\{clotran-mode-map}"
   ;; CIDER's jack-in, when CIDER is there, runs clotran nrepl
   (setq-local cider-jack-in-cmd (clotran--nrepl-command))
+  ;; completion from the running clotran, ahead of eglot's when connected
+  (add-hook 'completion-at-point-functions #'clotran-completion-at-point -10 t)
   (if (not (clotran--program))
       (message "clotran is not installed: M-x clotran-install installs it")
     (when (and clotran-eglot-auto (fboundp 'eglot-ensure) (buffer-file-name))
@@ -307,6 +309,7 @@ status."
         ("out" . ,(apply #'concat (mapcar (lambda (m) (cdr (assoc "out" m))) rs)))
         ("err" . ,(apply #'concat (mapcar (lambda (m) (cdr (assoc "err" m))) rs)))
         ("ex" . ,(cl-some (lambda (m) (cdr (assoc "ex" m))) rs))
+        ("completions" . ,(apply #'append (mapcar (lambda (m) (cdr (assoc "completions" m))) rs)))
         ("new-session" . ,(cl-some (lambda (m) (cdr (assoc "new-session" m))) rs))
         ("status" . ,(apply #'append (mapcar (lambda (m) (cdr (assoc "status" m))) rs)))))))
 
@@ -364,6 +367,29 @@ Connected already: say so."
   (when (and clotran--server (process-live-p clotran--server)) (delete-process clotran--server))
   (setq clotran--conn nil clotran--server nil clotran--session nil)
   (message "clotran: disconnected"))
+
+;;; completing
+
+(defun clotran-completion-at-point ()
+  "Complete the symbol at point from the running clotran (nREPL completions).
+What the namespace and its aliases really hold: `plot/' offers plot's
+public vars and nothing else.  Not connected: nil, so another source
+(eglot's) completes."
+  (when (clotran--connected-p)
+    (let ((bounds (bounds-of-thing-at-point 'symbol)))
+      (when bounds
+        (let* ((start (car bounds)) (end (cdr bounds))
+               (ns (ignore-errors (clojure-find-ns))))
+          (list start end
+                (completion-table-dynamic
+                 (lambda (prefix)
+                   (mapcar (lambda (c) (cdr (assoc "candidate" c)))
+                           (cdr (assoc "completions"
+                                       (clotran--request-sync
+                                        (append `(("op" . "completions") ("prefix" . ,prefix))
+                                                (when (and ns (clotran--ns-loaded-p ns)) `(("ns" . ,ns))))
+                                        5))))))
+                :exclusive 'no))))))
 
 ;;; evaluating
 

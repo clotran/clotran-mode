@@ -54,6 +54,16 @@
       (call-interactively #'clotran-jack-in)
       (check "C-c C-z starts clotran nrepl in the project and connects" (and (wait-for #'clotran--connected-p 90) t) t)
       (check "the session" (stringp clotran--session) t)
+      (check "completion asks the running clotran: an alias offers its namespace's vars, nothing it has seen elsewhere"
+             (progn (clotran--request-sync (quote (("op" . "eval") ("code" . "(require (quote [clojure.string :as str]))"))))
+                    (with-temp-buffer
+                      (clotran-mode)
+                      (insert "(str/up")
+                      (let* ((c (clotran-completion-at-point))
+                             (cands (all-completions (buffer-substring-no-properties (nth 0 c) (nth 1 c)) (nth 2 c))))
+                        (list (and (member "str/upper-case" cands) t)
+                              (cl-every (lambda (x) (string-prefix-p "str/up" x)) cands)))))
+             (quote (t t)))
       (check "C-x C-e evaluates the form before point -- in user, and says so, while the file's namespace is not loaded"
              (progn (goto-char (point-max)) (insert "(+ 1 2)")
                     (list (call-interactively #'clotran-eval-last-sexp)
