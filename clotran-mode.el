@@ -38,6 +38,7 @@
 (require 'project)
 (require 'dape)
 (require 'cl-lib)
+(require 'comint)
 (require 'subr-x)
 
 (defgroup clotran nil
@@ -390,6 +391,39 @@ public vars and nothing else.  Not connected: nil, so another source
                                                 (when (and ns (clotran--ns-loaded-p ns)) `(("ns" . ,ns))))
                                         5))))))
                 :exclusive 'no))))))
+
+;;; a REPL to type at
+
+(defconst clotran-repl-banner
+  ";; clotran -- type a form and press Enter:  (+ 1 2)
+;; M-p / M-n bring back the previous / next one.  C-x k closes the REPL.
+"
+  "What a new REPL buffer says first.")
+
+(define-derived-mode clotran-repl-mode comint-mode "clotran REPL"
+  "The clotran REPL in a buffer: type a form, press Enter.
+\\{clotran-repl-mode-map}"
+  (setq-local comint-prompt-regexp "^[^ \n]*=> *")
+  (setq-local comint-prompt-read-only t)
+  (set-syntax-table clojure-mode-syntax-table)
+  (setq-local comment-start ";"))
+
+;;;###autoload
+(defun clotran-repl ()
+  "Start clotran's REPL in a buffer of its own, *clotran-repl*, and go there.
+It runs in this buffer's project when it has one, else in `default-directory'.
+Running already: go to it."
+  (interactive)
+  (let ((buf (get-buffer-create "*clotran-repl*")))
+    (unless (comint-check-proc buf)
+      (let ((default-directory (if buffer-file-name (clotran--project-root) default-directory)))
+        (with-current-buffer buf
+          (let ((inhibit-read-only t)) (erase-buffer) (insert clotran-repl-banner))
+          (make-comint-in-buffer "clotran-repl" buf (clotran--command))
+          (clotran-repl-mode))))
+    (pop-to-buffer-same-window buf)
+    (goto-char (point-max))
+    buf))
 
 ;;; evaluating
 

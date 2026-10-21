@@ -120,6 +120,17 @@
               (eglot-shutdown server)))
         (princ "note: no eglot in this Emacs, the language server part is skipped\n"))
       (clotran-quit)
+      (check "M-x clotran-repl: a REPL to type at -- the banner, a form typed and Enter, its value"
+             (let ((buf (clotran-repl)))
+               (with-current-buffer buf
+                 (wait-for (lambda () (string-match-p "user=> *\\'" (buffer-string))) 90)
+                 (goto-char (point-max)) (insert "(+ 1 2)") (comint-send-input)
+                 (wait-for (lambda () (string-match-p "^3$" (buffer-string))) 30)
+                 (prog1 (list major-mode
+                              (and (string-prefix-p ";; clotran -- type a form" (buffer-string)) t)
+                              (and (string-match-p "^3$" (buffer-string)) t))
+                   (kill-process (get-buffer-process buf)))))
+             '(clotran-repl-mode t t))
       (check "C-c C-q disconnects and stops the server" (list (clotran--connected-p) clotran--server) '(nil nil))))
   (dolist (p (process-list)) (when (string-prefix-p "clotran" (process-name p)) (delete-process p)))
   (delete-directory root t))

@@ -11,6 +11,9 @@ on Fortran -- installing clojure-mode and dape with it:
   Fortran of a package; `C-h .` shows the documentation; symbols,
   completion and errors as you type, with no REPL running. eglot starts
   in every clotran buffer (`clotran-eglot-auto`);
+- a REPL to type at: `M-x clotran-repl` opens `*clotran-repl*`, clotran
+  in a buffer -- type a form, Enter, and its value comes back; `M-p` and
+  `M-n` bring back earlier inputs;
 - a REPL of clotran's own: `C-c C-z` (`clotran-jack-in`) starts
   `clotran nrepl` for the project and connects to it through the small
   nREPL client in this file -- base operations only, so nothing on the
